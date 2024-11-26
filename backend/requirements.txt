@@ -2,3 +2,6 @@ flask
 youtube_transcript_api
 yt_dlp
 faster_whisper
+chromadb
+ollama
+srt

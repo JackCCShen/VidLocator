@@ -4,8 +4,23 @@ from urllib.parse import urlparse, parse_qs
 import yt_dlp
 import torch
 from faster_whisper import WhisperModel
+import os
 
 class SubtitleManager:
+    def __init__(self, save_dir="subtitles/"):
+        """
+        Initialize the manager with a directory to save subtitles.
+
+        Args:
+            save_dir (str): path of the srt directory.
+
+        Returns:
+            None
+        """
+        self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
+
+
     def __extract_video_id(self, youtube_url):
         """
         Extract and return the video ID from a YouTube URL.
@@ -93,20 +108,22 @@ class SubtitleManager:
             ydl.download([youtube_url])
 
 
-    def get_subtitle(self, youtube_url):
+    def fetch_subtitle(self, youtube_url):
         """
-        Retrieve the subtitle for a YouTube video. If unavailable, download the audio 
+        Fetch and save the subtitle in SRT format for a YouTube video. If unavailable, download the audio 
         and generate subtitles using a Whisper model.
 
         Args:
             youtube_url (str): The full URL of the YouTube video.
 
         Returns:
-            str: Subtitles in SRT format or None if an error occurs.
+            bool: Successful or not
         """
         video_id = self.__extract_video_id(youtube_url)
         if video_id is None:
-            return None
+            return False
+        
+        srt_file_path = os.path.join(self.save_dir, f"{video_id}.srt")
         
         # Attempt to fetch subtitles using YouTubeTranscriptApi
         try:
@@ -114,7 +131,10 @@ class SubtitleManager:
             formatter = SRTFormatter()
 
             srt_formatted = formatter.format_transcript(transcript)
-            return srt_formatted
+            with open(srt_file_path, "w", encoding="utf-8") as srt_file:
+                srt_file.write(srt_formatted)
+            print(f"Generated and saved subtitles: {srt_file_path}")
+            return True
         except:
             pass
 
@@ -123,9 +143,18 @@ class SubtitleManager:
         print(f"Donwnloading audio of {youtube_url}...")
         self.__download_audio(youtube_url, video_id)
         print("Transcribing...")
-        return self.__generate_subtitles_from_audio(audio_file)
 
-# URL='https://www.youtube.com/watch?v=0n809nd4Zu4&ab_channel=freeCodeCamp.org'
-# sub = SubtitleManager()
-# subtitle = sub.get_subtitle(URL)
-# print(subtitle)
+        srt_content = self.__generate_subtitles_from_audio(audio_file)
+        if srt_content:
+            with open(srt_file_path, "w", encoding="utf-8") as srt_file:
+                srt_file.write(srt_content)
+            print(f"Generated and saved subtitles: {srt_file_path}")
+            return True
+        
+        print("Failed to generate subtitles.")
+        return False
+
+URL='https://www.youtube.com/watch?v=0n809nd4Zu4&ab_channel=freeCodeCamp.org'
+sub = SubtitleManager()
+subtitle = sub.fetch_subtitle(URL)
+print(subtitle)

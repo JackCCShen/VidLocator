@@ -1,2 +1,4 @@
 __pycache__/
 backend/audio
+backend/subtitles
+backend/db
