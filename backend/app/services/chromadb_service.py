@@ -1,9 +1,9 @@
-import srt
 import chromadb
 from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
 import ollama
+from app.utils import parse_srt
 
-class ChromaDBManager:
+class ChromaDBService:
     def __init__(self, chroma_persist_dir="db/chroma"):
         """
         Initialize ChromaDB manager.
@@ -17,29 +17,32 @@ class ChromaDBManager:
         )
 
 
-    def parse_srt(self, srt_text):
+    def store_metadata(self, video_id, title, description):
         """
-        Parse SRT subtitles into structured segments.
+        Store title, description into a ChromaDB collection.
         """
-        subtitles = list(srt.parse(srt_text))
-        return [{
-            "start": str(sub.start),
-            "end": str(sub.end),
-            "text": sub.content
-        } for sub in subtitles]
+        metadata_collection = self.chroma_client.get_or_create_collection(name="metadata")
+        metadata_collection.add(
+            documents=[title, description],
+            metadatas=[
+                {"type": "title"},
+                {"type": "description"},
+            ],
+            ids=[f"{video_id}_title", f"{video_id}_description"]
+        )
     
 
     def store_subtitles(self, srt_text, video_id):
         """
         Store subtitles into a ChromaDB collection.
         """
-        segments = self.parse_srt(srt_text)
+        segments = parse_srt(srt_text)
 
         collection_name = f"subtitles_{video_id}"
         collection = self.chroma_client.get_or_create_collection(name=collection_name)
 
         for i, seg in enumerate(segments):
-            response = ollama.embeddings(model="llama3.2", prompt=seg['text'])
+            response = ollama.embeddings(model="llama3.2", prompt=seg["text"])
             embedding = response["embedding"]
             collection.add(
                 ids=[f"{video_id}_segment_{i}"],
@@ -71,14 +74,27 @@ class ChromaDBManager:
             n_results=max_results_len
         )
 
-        ret = []
-        for i, distance in enumerate(results['distances'][0]):
-            if distance < results['distances'][0][0] * distance_threshold_ratio:
-                ret.append(results['metadatas'][0][i])
-            else:
-                break
+        # ret = []
+        # for i, distance in enumerate(results['distances'][0]):
+        #     if distance < results['distances'][0][0] * distance_threshold_ratio:
+        #         ret.append(results['metadatas'][0][i])
+        #     else:
+        #         break
+        
 
-        return ret
+        return [(metadata['start'], metadata['text']) for metadata in results['metadatas'][0]]
+    
+    def get_metadata_by_video_id(self, video_id):
+        """
+        Get metadata_by_video_id
+        """
+        metadata_collection = self.chroma_client.get_or_create_collection(name="metadata")
+        ids_to_query = [f"{video_id}_title", f"{video_id}_description"]
+        result = metadata_collection.get(ids=ids_to_query)
+
+        title, description = result["documents"]
+        
+        return title, description
 
 # srt_file_path = "subtitles/0n809nd4Zu4.srt"
 # with open(srt_file_path, "r", encoding="utf-8") as srt_file:

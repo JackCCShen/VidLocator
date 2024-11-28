@@ -4,9 +4,26 @@ from urllib.parse import urlparse, parse_qs
 import yt_dlp
 import torch
 from faster_whisper import WhisperModel
+import os
+# from transformers import pipeline
+from app.utils import merge_srt_sentences
 
-class SubtitleManager:
-    def __extract_video_id(self, youtube_url):
+class YouTubeService:
+    def __init__(self, save_dir="subtitles/"):
+        """
+        Initialize the manager with a directory to save subtitles.
+
+        Args:
+            save_dir (str): path of the srt directory.
+
+        Returns:
+            None
+        """
+        self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
+
+    @classmethod
+    def extract_video_id(self, youtube_url):
         """
         Extract and return the video ID from a YouTube URL.
 
@@ -81,7 +98,7 @@ class SubtitleManager:
         """
         output_path = "audio/"
         if video_id is None:
-            video_id = self.__extract_video_id(youtube_url)
+            video_id = self.extract_video_id(youtube_url)
 
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -93,20 +110,20 @@ class SubtitleManager:
             ydl.download([youtube_url])
 
 
-    def get_subtitle(self, youtube_url):
+    def fetch_subtitle(self, youtube_url):
         """
-        Retrieve the subtitle for a YouTube video. If unavailable, download the audio 
+        Fetch and save the subtitle in SRT format for a YouTube video. If unavailable, download the audio 
         and generate subtitles using a Whisper model.
 
-        Args:
-            youtube_url (str): The full URL of the YouTube video.
+        Args: youtube_url (str): The full URL of the YouTube video.
 
-        Returns:
-            str: Subtitles in SRT format or None if an error occurs.
+        Returns: str (srt file path) or None
         """
-        video_id = self.__extract_video_id(youtube_url)
+        video_id = self.extract_video_id(youtube_url)
         if video_id is None:
-            return None
+            return False
+        
+        srt_file_path = os.path.join(self.save_dir, f"{video_id}.srt")
         
         # Attempt to fetch subtitles using YouTubeTranscriptApi
         try:
@@ -114,7 +131,11 @@ class SubtitleManager:
             formatter = SRTFormatter()
 
             srt_formatted = formatter.format_transcript(transcript)
-            return srt_formatted
+            with open(srt_file_path, "w", encoding="utf-8") as srt_file:
+                srt_file.write(srt_formatted)
+            merge_srt_sentences(srt_file_path)
+            print(f"Generated and saved subtitles: {srt_file_path}")
+            return srt_file_path
         except:
             pass
 
@@ -123,9 +144,63 @@ class SubtitleManager:
         print(f"Donwnloading audio of {youtube_url}...")
         self.__download_audio(youtube_url, video_id)
         print("Transcribing...")
-        return self.__generate_subtitles_from_audio(audio_file)
 
-# URL='https://www.youtube.com/watch?v=0n809nd4Zu4&ab_channel=freeCodeCamp.org'
+        srt_content = self.__generate_subtitles_from_audio(audio_file)
+        if srt_content:
+            with open(srt_file_path, "w", encoding="utf-8") as srt_file:
+                srt_file.write(srt_content)
+            merge_srt_sentences(srt_file_path)
+            
+            print(f"Generated and saved subtitles: {srt_file_path}")
+            return srt_file_path
+        
+        print("Failed to generate subtitles.")
+        return None
+    
+
+    def fetch_metadata(self, youtube_url):
+        """ 
+        Fetch the title and description for a YouTube video.
+
+        Args: youtube_url (str): The full URL of the YouTube video.
+
+        Returns: title (str), description (str)
+        """
+        ydl_opts = {"quiet": True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(youtube_url, download=False)
+            title = info.get("title", "Unknown")
+            description = info.get("description", "No description")
+        return title, description
+
+
+    # def summarize_subtitle(self, srt_file, max_length=150):
+    #     """
+    #     Summarize the text content of an SRT file using LLM.
+
+    #     Args:
+    #         srt_file (str): Path to the SRT file.
+    #         model (str): Name of the model to use for summarization.
+    #         max_length (int): Maximum length of the summary.
+    #     """
+    #     with open(srt_file, 'r', encoding='utf-8') as file:
+    #         srt_content = file.read()
+        
+    #     subtitles = list(srt.parse(srt_content))
+    #     text_lines = [subtitle.content for subtitle in subtitles]
+    #     full_text = "\n".join(text_lines)
+
+    #     # Summarize the extracted text
+    #     summarizer = pipeline("summarization", device=0 if torch.cuda.is_available() else -1, model="sshleifer/distilbart-cnn-12-6")
+    #     summary = summarizer(full_text, max_length=max_length, min_length=50, do_sample=False)
+    #     return summary[0]['summary_text']
+    
+
 # sub = SubtitleManager()
-# subtitle = sub.get_subtitle(URL)
-# print(subtitle)
+# s = sub.summarize_subtitle(r"subtitles\0n809nd4Zu4.srt")
+# print(s)
+
+# URL = r"https://www.youtube.com/watch?v=0n809nd4Zu4&ab_channel=freeCodeCamp.org"
+# yt = YouTubeService()
+# title, description = yt.fetch_metadata(URL)
+# print(title, description)
