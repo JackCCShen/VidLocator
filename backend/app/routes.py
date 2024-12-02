@@ -7,9 +7,16 @@ from app.services import ChromaDBService, YouTubeService, LLMService
 @app.route('/store_video_data', methods=['POST'])
 def store_video_data():
     youtube_url = request.json['youtube_url']
-    print(youtube_url)
     try:
+        chroma_db = ChromaDBService()
         yt = YouTubeService()
+        video_id = YouTubeService.extract_video_id(youtube_url)
+
+        # Check if the data has existed in db
+        if chroma_db.video_exists(video_id):
+            return jsonify({"message": "Existed"}), 200
+        
+        # Attempt to fetch subtitle
         srt_file_path = yt.fetch_subtitle(youtube_url)
         title, description = yt.fetch_metadata(youtube_url)
         if srt_file_path is None:
@@ -19,14 +26,12 @@ def store_video_data():
         with open(srt_file_path, 'r', encoding='utf-8') as file:
             srt_content = file.read()
 
-        video_id = YouTubeService.extract_video_id(youtube_url)
-
-        chroma_db = ChromaDBService()
         chroma_db.store_metadata(video_id, title, description)
         chroma_db.store_subtitles(srt_content, video_id)
         return jsonify({"message": "Sucess"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
 
 @app.route('/query_timestamp', methods=['POST'])
 def query_timestamp():
@@ -42,7 +47,6 @@ def query_timestamp():
         llm = LLMService()
         keywords = llm.generate_rag_keywords(title, description, query_text)
         candidates = set(chroma_db.find_subtitle_by_query(query_text, video_id))
-        # print(chroma_db.find_subtitle_by_query(query_text, video_id))
 
         # candidates = []
         for k in keywords:

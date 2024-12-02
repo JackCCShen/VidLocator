@@ -17,6 +17,21 @@ class ChromaDBService:
         )
 
 
+    def video_exists(self, video_id):
+        """
+        Check if the data of a video exists in ChromaDB.
+
+        Args:
+            video_id (str): Id of the video to check.
+
+        Returns:
+            bool: True if the video data exists, False otherwise.
+        """
+        collection_name = f"subtitles_{video_id}"
+        collections = self.chroma_client.list_collections()
+        return any(collection.name == collection_name for collection in collections)
+
+
     def store_metadata(self, video_id, title, description):
         """
         Store title, description into a ChromaDB collection.
@@ -96,18 +111,3 @@ class ChromaDBService:
         
         return title, description
 
-# srt_file_path = "subtitles/0n809nd4Zu4.srt"
-# with open(srt_file_path, "r", encoding="utf-8") as srt_file:
-#     srt_text = srt_file.read()
-
-# chroma_manager = ChromaDBManager()
-
-# collection_name = chroma_manager.store_subtitles(srt_text, "0n809nd4Zu4")
-# print(collection_name)
-
-# user_query = "How to do a Chrome storage sync?"
-# video_id = "0n809nd4Zu4"
-
-# result = chroma_manager.find_subtitle_by_query(user_query, video_id)
-
-# print(result)
