@@ -4,6 +4,8 @@ from collections import Counter
 
 from app.services import ChromaDBService, YouTubeService, LLMService
 
+queue_set = set()
+
 @app.route('/store_video_data', methods=['POST'])
 def store_video_data():
     youtube_url = request.json['youtube_url']
@@ -11,6 +13,9 @@ def store_video_data():
         chroma_db = ChromaDBService()
         yt = YouTubeService()
         video_id = YouTubeService.extract_video_id(youtube_url)
+        if video_id in queue_set:
+            return jsonify({"message": "Processing"}), 200
+        queue_set.add(video_id)
 
         # Check if the data has existed in db
         if chroma_db.video_exists(video_id):
@@ -28,6 +33,7 @@ def store_video_data():
 
         chroma_db.store_metadata(video_id, title, description)
         chroma_db.store_subtitles(srt_content, video_id)
+        queue_set.remove(video_id)
         return jsonify({"message": "Sucess"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400

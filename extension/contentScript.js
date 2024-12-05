@@ -45,7 +45,7 @@
       data = await response.json();
       const vidLocatorData =
         JSON.parse(sessionStorage.getItem("vidLocatorData")) || {};
-      vidLocatorData.timestamps = data;
+      vidLocatorData.timestamps = data; // list of [timestamp, explaination]
       sessionStorage.setItem("vidLocatorData", JSON.stringify(vidLocatorData));
       // console.log("Get timestamps", data);
       return data;
@@ -81,7 +81,7 @@
       cursor: "pointer",
     });
 
-    data.forEach((timestamp) => {
+    data.forEach(([timestamp, reason]) => {
       const li = document.createElement("li");
       Object.assign(li.style, {
         padding: "8px 10px",
@@ -91,7 +91,20 @@
         boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
       });
 
-      li.innerText = timestamp;
+      const timestampSpan = document.createElement("span");
+      timestampSpan.innerText = timestamp;
+      timestampSpan.style.fontWeight = "bold"; // Make the timestamp bold
+      timestampSpan.style.marginRight = "10px"; // Add some space between the timestamp and the explanation
+      timestampSpan.style.fontSize = "18px";
+
+      // Create a span for the explanation
+      const explanationSpan = document.createElement("span");
+      explanationSpan.innerText = reason;
+      explanationSpan.style.fontSize = "16px";
+
+      // Append the spans to the <li> element
+      li.appendChild(timestampSpan);
+      li.appendChild(explanationSpan);
 
       li.addEventListener("click", () => {
         const video = document.querySelector("video");
@@ -292,7 +305,7 @@
       const searchBtn = document.createElement("img");
       searchBtn.src = chrome.runtime.getURL("assets/Search_Icon.png");
       searchBtn.className = "ytp-button vidlocator-btn";
-      searchBtn.title = "Save timestamp";
+      searchBtn.title = "VidLocator: Find timestamp";
       searchBtn.style.width = "30px";
       searchBtn.style.height = "auto";
 

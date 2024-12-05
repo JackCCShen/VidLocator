@@ -55,18 +55,40 @@ def extract_timestamps(input_string):
     return timestamps
 
 
+def extract_timestamps_explaination(input_str):
+    chunks = [chunk.strip() for chunk in input_str.strip().split("\n\n")]
 
-def group_timestamps(timestamps, interval_sec=60):
-    time_objects = [datetime.strptime(ts, "%H:%M:%S") for ts in timestamps]
+    parsed_data = []
+    unique_data = {}
+    for chunk in chunks:
+        lines = chunk.split("\n")
+        timestamp = lines[0].replace("- Timestamp: ", "").strip()
+        pattern = r'\b(?:[0-9]|[0-9]{2}):[0-5][0-9]:[0-5][0-9]\b'
+
+        timestamp = re.findall(pattern, timestamp)
+        if len(timestamp):
+            timestamp = timestamp[0]
+        reason = lines[1].replace("- Reason: ", "").strip()
+        unique_data[timestamp] = reason
+
+    parsed_data = [[timestamp, reason] for timestamp, reason in unique_data.items()]
+    
+    return parsed_data
+
+
+def group_timestamps_with_reasons(data, interval_sec=60):
+    # Extract timestamps and convert them to datetime objects
+    time_objects = [(datetime.strptime(ts, "%H:%M:%S"), reason) for ts, reason in data]
     grouped = []
     previous_time = None
 
-    for current_time in time_objects:
+    for current_time, reason in time_objects:
         # If this is the first timestamp or the time difference is >= 1 minute, add to the group
         if previous_time is None or current_time - previous_time >= timedelta(seconds=interval_sec):
-            grouped.append(current_time)
+            grouped.append((current_time, reason))
         previous_time = current_time
 
-    grouped_timestamps = [time.strftime("%H:%M:%S") for time in grouped]
+    # Convert grouped datetime objects back to strings
+    grouped_timestamps = [(time.strftime("%H:%M:%S"), reason) for time, reason in grouped]
     return grouped_timestamps
 

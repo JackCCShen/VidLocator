@@ -1,7 +1,7 @@
 import os
 import openai
 from dotenv import load_dotenv
-from app.utils import extract_timestamps, group_timestamps
+from app.utils import extract_timestamps, extract_timestamps_explaination, group_timestamps_with_reasons
 
 class LLMService():
     def __init__(self, model="llama-3.2-90b-vision-preview") -> None:
@@ -68,19 +68,23 @@ class LLMService():
             "### Timestamp-Text Candidates:\n"
             f"{candidates_str}\n\n"
             "### Output Format:\n"
-            "Provide the relevant timestamp(s) and a brief explanation for your choice, formatted as follows:\n\n"
+            "Provide the relevant timestamp(s) and a brief, concise reason for your choice, formatted as follows:\n\n"
             "- Timestamp: [HH:MM:SS]\n"
-            "- Reason: [Explanation]\n\n"
+            "- Reason: [Reason]\n\n"
             "If no candidate is relevant, respond with:\n"
             "\"No relevant timestamp found.\""
         )
 
         res = self.__llm_generate(prompt)
-        timestamps = extract_timestamps(res)
-        for i in range(len(timestamps)):
-            if timestamps[i][2] != ':':
-                timestamps[i] = '0' + timestamps[i]
-        timestamps = sorted(list(set(timestamps)))
-        timestamps = group_timestamps(timestamps, interval_sec=60)
+        # print(res)
+        res_list = extract_timestamps_explaination(res)
+        # print(res_list)
+        # timestamps = extract_timestamps(res)
+        for i in range(len(res_list)):
+            if res_list[i][0][2] != ':':
+                res_list[i][0] = '0' + res_list[i][0]
 
-        return timestamps
+        res_list.sort(key=lambda x: x[0])
+        res_list = group_timestamps_with_reasons(res_list, interval_sec=60)
+
+        return res_list
