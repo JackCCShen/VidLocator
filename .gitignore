@@ -4,3 +4,5 @@ backend/subtitles
 backend/db
 .venv
 .env
+
+node_modules

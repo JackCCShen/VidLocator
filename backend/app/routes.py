@@ -35,6 +35,7 @@ def store_video_data():
 
 @app.route('/query_timestamp', methods=['POST'])
 def query_timestamp():
+    print(request.json)
     query_text = request.json['query_text']
     youtube_url = request.json['youtube_url']
 
