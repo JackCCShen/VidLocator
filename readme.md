@@ -54,6 +54,7 @@ Then make sure VidLocator has been turned on.
 * The user can type a query text and select the recommended timestamp that matches their needs.
   * ![1733459336937](image/readme/1733459336937.png)
   * ![1733459381299](image/readme/1733459381299.png)
+* After clicking the recommended timestamp, the video will jump to the corresponding timestamp.![1733459747544](image/readme/1733459747544.png)
 
 ### Architecture
 
@@ -132,10 +133,11 @@ In this set of experiments, we can observe that processing time has a positive r
 
 ## Conclusion
 
-VidLocator is a search engine for video subtitle.
+VidLocator is a search engine for video subtitle, providing a convience tool to jump to timestamp.
 
 ### Limitation
 
 * Each embedding record represents one sentence. If the user's query involves multi-sentence context, the results may not align with the user's expectations.
 * The processing time for STT is significant, especially for longer videos, leading to a poor user experience when subtitle data for a video has not yet been stored in the system.
 * VidLocator does not account for the visual data in videos.
+* VidLocator does not support languages other than English.
