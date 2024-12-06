@@ -1,13 +1,21 @@
 from app import app
 from flask import request, jsonify
 from collections import Counter
-
+import time 
+import logging
 from app.services import ChromaDBService, YouTubeService, LLMService
-
+log = True
 queue_set = set()
+
+store_video_logger = logging.getLogger("store_video_logger")
+store_video_handler = logging.FileHandler("store_video_data.log")
+store_video_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+store_video_logger.addHandler(store_video_handler)
+store_video_logger.setLevel(logging.INFO)
 
 @app.route('/store_video_data', methods=['POST'])
 def store_video_data():
+    store_video_data_start_time = time.time()
     youtube_url = request.json['youtube_url']
     try:
         chroma_db = ChromaDBService()
@@ -20,10 +28,20 @@ def store_video_data():
         # Check if the data has existed in db
         if chroma_db.video_exists(video_id):
             return jsonify({"message": "Existed"}), 200
+
+        fetch_metadata_start_time = time.time()
+        title, description = yt.fetch_metadata(youtube_url)
+        fetch_metadata_end_time = time.time()
+        if log:
+            store_video_logger.info(f"{video_id} Fetch metadata Time taken: {fetch_metadata_end_time - fetch_metadata_start_time:.2f} seconds.")
+     
+        chroma_db.store_metadata(video_id, title, description)
+        store_metadata_end_time = time.time()
+        if log:
+            store_video_logger.info(f"{video_id} Store metadata Time taken: {store_metadata_end_time - fetch_metadata_end_time:.2f} seconds.")
         
         # Attempt to fetch subtitle
-        srt_file_path = yt.fetch_subtitle(youtube_url)
-        title, description = yt.fetch_metadata(youtube_url)
+        srt_file_path = yt.fetch_subtitle(youtube_url, log, store_video_logger, force_download_audio=False)
         if srt_file_path is None:
             return jsonify({"message": "Fail"}), 200
 
@@ -31,9 +49,17 @@ def store_video_data():
         with open(srt_file_path, 'r', encoding='utf-8') as file:
             srt_content = file.read()
 
-        chroma_db.store_metadata(video_id, title, description)
+        store_subtitles_start_time = time.time()
         chroma_db.store_subtitles(srt_content, video_id)
+        store_subtitles_end_time = time.time()
+        if log:
+            store_video_logger.info(f"{video_id} Store Subtitle Data Time taken: {store_subtitles_end_time - store_subtitles_start_time:.2f} seconds.")
+        
         queue_set.remove(video_id)
+
+        store_video_data_end_time = time.time()
+        if log:
+            store_video_logger.info(f"{video_id} Store Video Data Time taken: {store_video_data_end_time - store_video_data_start_time:.2f} seconds.")
         return jsonify({"message": "Sucess"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400

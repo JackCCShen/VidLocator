@@ -5,9 +5,17 @@ import yt_dlp
 import torch
 from faster_whisper import WhisperModel
 import os
+import logging
+import time
 # from transformers import pipeline
 from app.utils import merge_srt_sentences
 
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+#     filename="subtitle_fetch.log",
+#     filemode="a"
+# )
 class YouTubeService:
     def __init__(self, save_dir="subtitles/"):
         """
@@ -110,7 +118,7 @@ class YouTubeService:
             ydl.download([youtube_url])
 
 
-    def fetch_subtitle(self, youtube_url):
+    def fetch_subtitle(self, youtube_url, log=False, logger=None, force_download_audio=False):
         """
         Fetch and save the subtitle in SRT format for a YouTube video. If unavailable, download the audio 
         and generate subtitles using a Whisper model.
@@ -119,6 +127,7 @@ class YouTubeService:
 
         Returns: str (srt file path) or None
         """
+        start_time = time.time()
         video_id = self.extract_video_id(youtube_url)
         if video_id is None:
             return False
@@ -126,23 +135,33 @@ class YouTubeService:
         srt_file_path = os.path.join(self.save_dir, f"{video_id}.srt")
         
         # Attempt to fetch subtitles using YouTubeTranscriptApi
-        try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id)
-            formatter = SRTFormatter()
+        if not force_download_audio:
+            try:
+                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                formatter = SRTFormatter()
 
-            srt_formatted = formatter.format_transcript(transcript)
-            with open(srt_file_path, "w", encoding="utf-8") as srt_file:
-                srt_file.write(srt_formatted)
-            merge_srt_sentences(srt_file_path)
-            print(f"Generated and saved subtitles: {srt_file_path}")
-            return srt_file_path
-        except:
-            pass
-
+                srt_formatted = formatter.format_transcript(transcript)
+                with open(srt_file_path, "w", encoding="utf-8") as srt_file:
+                    srt_file.write(srt_formatted)
+                merge_srt_sentences(srt_file_path)
+                print(f"Generated and saved subtitles: {srt_file_path}")
+                end_time = time.time()
+                if log:
+                    logger.info(f"{video_id} Fetched subtitles directly from API. Time taken: {end_time - start_time:.2f} seconds.")
+                return srt_file_path
+            except:
+                pass
+        
+        start_download_time = time.time()
         # generate subtitle from audio
         audio_file = f"audio/{video_id}.webm"
         print(f"Donwnloading audio of {youtube_url}...")
         self.__download_audio(youtube_url, video_id)
+
+        end_download_time = time.time()
+        if log:
+            logger.info(f"{video_id} Audio downloaded. Time taken: {end_download_time - start_download_time:.2f} seconds.")
+
         print("Transcribing...")
 
         srt_content = self.__generate_subtitles_from_audio(audio_file)
@@ -152,6 +171,10 @@ class YouTubeService:
             merge_srt_sentences(srt_file_path)
             
             print(f"Generated and saved subtitles: {srt_file_path}")
+            end_transcribe_time = time.time()
+            
+            if log:
+                logger.info(f"{video_id} Audio transcription completed. Time taken: {end_transcribe_time - end_download_time:.2f} seconds.")
             return srt_file_path
         
         print("Failed to generate subtitles.")
